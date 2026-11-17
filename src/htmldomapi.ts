@@ -84,12 +84,48 @@ function insertBefore(
     parentNode = node ?? parentNode;
   }
   if (isDocumentFragment(newNode)) {
-    newNode = parseFragment(newNode, parentNode);
+    const fragment = parseFragment(newNode, parentNode);
+    // A fragment that has been inserted once is an empty handle: its content
+    // lives in the DOM already. Inserting the handle would insert nothing, so
+    // move the range of nodes the fragment tracks instead.
+    if (
+      fragment.childNodes.length === 0 &&
+      fragment.firstChildNode !== null &&
+      fragment.lastChildNode !== null
+    ) {
+      const nodes = contentNodes(
+        fragment.firstChildNode,
+        fragment.lastChildNode
+      );
+      if (
+        referenceNode !== null &&
+        nodes.indexOf(referenceNode as ChildNode) !== -1
+      ) {
+        return;
+      }
+      for (const node of nodes) parentNode.insertBefore(node, referenceNode);
+      return;
+    }
+    newNode = fragment;
   }
   if (referenceNode && isDocumentFragment(referenceNode)) {
     referenceNode = parseFragment(referenceNode).firstChildNode;
   }
   parentNode.insertBefore(newNode, referenceNode);
+}
+
+/**
+ * The nodes from `first` to `last`, both included. The content of a fragment is
+ * a contiguous run of children of the fragment's parent.
+ */
+function contentNodes(first: ChildNode, last: ChildNode): ChildNode[] {
+  const nodes: ChildNode[] = [first];
+  let node: ChildNode | null = first;
+  while (node !== null && node !== last) {
+    node = node.nextSibling as ChildNode | null;
+    if (node !== null) nodes.push(node);
+  }
+  return nodes;
 }
 
 function removeChild(node: Node, child: Node): void {
